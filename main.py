@@ -173,6 +173,18 @@ def main():
     zebra_menu = ZebraMenu(is_draggable=True)
     zebra_menu.show()
 
+    qt_app.processEvents()  # ensures size/geometry is known
+
+    # Place ZebraMenu on the right side of the GLFW window
+    win_x, win_y = glfw.get_window_pos(window)          # screen coords
+    win_w, win_h = glfw.get_window_size(window)         # logical window size
+    padding = 16
+    menu_w = zebra_menu.frameGeometry().width()
+    menu_h = zebra_menu.frameGeometry().height()
+    x = win_x + win_w - menu_w - padding
+    y = win_y + padding  # top-aligned; change if you want centered
+    zebra_menu.move(int(x), int(y))
+
     # optional: hook signals
     zebra_menu.zebra.threshold_changed.connect(lambda v: print("threshold", v))
     zebra_menu.zebra.knockout_changed.connect(lambda v: print("knockout", v))

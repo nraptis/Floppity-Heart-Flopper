@@ -10,6 +10,8 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 from tools.tool_menu_top_bar import ToolMenuTopBar
 from tools.tool_menu_content_pane import ToolMenuContentPane
 
+from PySide6.QtGui import QPainter, QPainterPath, QColor, QPen
+from PySide6.QtCore import QRectF
 
 @dataclass
 class ToolMenuOverlayConfig:
@@ -38,6 +40,9 @@ class ToolMenu(QWidget):
         self.is_draggable = is_draggable
         self.overlay_config = overlay_config or ToolMenuOverlayConfig()
 
+        self._collapsed: bool = False
+        self._expanded_size = self.size()  # remembered once we show
+
         # Drag state
         self._dragging = False
         self._drag_anchor_global: Optional[QPoint] = None
@@ -55,8 +60,12 @@ class ToolMenu(QWidget):
             Qt.FramelessWindowHint |
             Qt.WindowStaysOnTopHint
         )
-        self.setAttribute(Qt.WA_TranslucentBackground, False)
-        self.setStyleSheet("background-color: white;")
+
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
+        #self.setAttribute(Qt.WA_TranslucentBackground, False)
+        #self.setStyleSheet("background-color: white;")
 
         root = QVBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -66,32 +75,107 @@ class ToolMenu(QWidget):
         self.setLayout(root)
 
         self.resize(640, 480)
+        self.resize(*initial_size)
 
-        # Basic styling (feel free to replace with your own QSS file)
         self.setStyleSheet("""
         QWidget#ToolMenu {
-            background: rgba(20, 20, 24, 210);
+            background: transparent;
             border: 1px solid rgba(255,255,255,40);
             border-radius: 10px;
         }
-        QWidget#ToolMenuTopBar {
-            background: rgba(35, 35, 40, 220);
+
+        QWidget#ToolMenuTopBar,
+        QWidget#ZebraMenuTopBar {
+            background-color: #0A0F1B;             /* slightly darker */
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
+            border-bottom: 1px solid rgba(255,255,255,30);
         }
+
         QLabel#ToolMenuTopBarTitle {
-            color: rgba(255,255,255,220);
+            color: rgba(235,245,255,230);
             font-weight: 600;
         }
+
         QPushButton#ToolMenuTopBarClose {
-            color: rgba(255,255,255,200);
-            background: rgba(255,255,255,20);
-            border: 1px solid rgba(255,255,255,30);
+            color: rgba(235,245,255,220);
+            background: rgba(255,255,255,18);
+            border: 1px solid rgba(255,255,255,28);
             border-radius: 6px;
         }
         QPushButton#ToolMenuTopBarClose:hover {
-            background: rgba(255,255,255,35);
+            background: rgba(255,255,255,30);
         }
+        QSlider::groove:horizontal {
+            height: 6px;
+            background: rgba(255,255,255,30);
+            border-radius: 3px;
+        }
+        QSlider::sub-page:horizontal {
+            background: rgba(40,140,255,180);
+            border-radius: 3px;
+        }
+        QSlider::add-page:horizontal {
+            background: rgba(255,255,255,18);
+            border-radius: 3px;
+        }
+        QSlider::handle:horizontal {
+            width: 16px;
+            height: 16px;
+            margin: -6px 0;               /* centers handle over groove */
+            border-radius: 8px;
+            background-color: #EAF2FF;     /* solid */
+            border: 1px solid rgba(0,0,0,70);
+        }
+
+        QSlider::handle:horizontal:hover {
+            background-color: #FFFFFF;
+        }
+                           
+        QWidget#ZebraSegmented {
+            background: rgba(255,255,255,10);
+            border: 1px solid rgba(255,255,255,22);
+            border-radius: 8px;
+        }
+
+        QPushButton#ZebraSegmentButton {
+            padding: 4px 10px;
+            border: none;
+            color: rgba(235,245,255,200);
+            background: transparent;
+        }
+
+        QPushButton#ZebraSegmentButton:checked {
+            background: rgba(40,140,255,180);
+            color: rgba(255,255,255,240);
+        }
+
+        QWidget#ZebraSegmented QPushButton:first-child {
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+        }
+
+        QWidget#ZebraSegmented QPushButton:last-child {
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+                           
+        QPushButton#ToolMenuTopBarMinimize {
+            color: rgba(235,245,255,220);
+            background: rgba(255,255,255,18);
+            border: 1px solid rgba(255,255,255,28);
+            border-radius: 6px;
+            font-weight: 700;
+        }
+        
+        QPushButton#ToolMenuTopBarMinimize:hover {
+            background: rgba(255,255,255,30);
+        }
+        
+        QPushButton#ToolMenuTopBarMinimize {
+            font-size: 14px;
+        }
+                           
         """)
 
     # ---- Drag API (called by ToolMenuTopBar) ----
@@ -111,3 +195,61 @@ class ToolMenu(QWidget):
         self._dragging = False
         self._drag_anchor_global = None
         self._drag_anchor_window_pos = None
+
+    def paintEvent(self, event) -> None:
+        radius = 12.0
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+
+        # Background
+        painter.fillPath(path, QColor("#0B1220"))
+
+        # Border
+        pen = QPen(QColor(255, 255, 255, 40))
+        pen.setWidthF(1.0)
+        painter.setPen(pen)
+        painter.drawPath(path)
+
+        painter.end()
+        super().paintEvent(event)
+
+    def is_collapsed(self) -> bool:
+        return self._collapsed
+
+    def toggle_collapsed(self) -> None:
+        self.set_collapsed(not self._collapsed)
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        if self._collapsed == collapsed:
+            return
+        self._collapsed = collapsed
+
+        if collapsed:
+            # remember expanded size before shrinking
+            self._expanded_size = self.size()
+
+            # hide content, keep top bar
+            self.content_pane.setVisible(False)
+
+            # shrink to just top bar (+ a tiny padding)
+            h = self.top_bar.height()
+            self.setMinimumHeight(h)
+            self.setMaximumHeight(h)
+            self.resize(self.width(), h)
+        else:
+            # restore content
+            self.content_pane.setVisible(True)
+
+            # restore sizing constraints
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)  # Qt's "no limit"
+
+            # restore previous expanded size
+            if self._expanded_size is not None:
+                self.resize(self._expanded_size)
