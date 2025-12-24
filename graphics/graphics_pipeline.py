@@ -20,9 +20,8 @@ from filesystem.file_utils import FileUtils
 from typing import Optional
 
 class GraphicsPipeline:
-    def __init__(self, base_path: str = "."):
-        self.base_path = base_path
-
+    def __init__(self):
+        
         # Sprite 2D shader functions and program
         self.function_sprite2d_vertex = self._load_shader_vertex("graphics/shaders/", "sprite_2d_vertex", "glsl")
         self.function_sprite2d_fragment = self._load_shader_fragment("graphics/shaders/", "sprite_2d_fragment", "glsl")
